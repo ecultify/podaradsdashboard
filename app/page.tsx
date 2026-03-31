@@ -19,11 +19,12 @@ import {
 const REFRESH_INTERVAL_SEC = Number(process.env.NEXT_PUBLIC_REFRESH_INTERVAL ?? 300);
 
 export default function Dashboard() {
-  const { data, displayOverrides, loading, error, refresh, lastRefreshed } = useDashboardData({
-    datePreset: 'maximum',
-    refreshInterval: REFRESH_INTERVAL_SEC,
-    autoRefresh: true,
-  });
+  const { data, displayOverrides, sheetConnection, loading, error, refresh, lastRefreshed } =
+    useDashboardData({
+      datePreset: 'maximum',
+      refreshInterval: REFRESH_INTERVAL_SEC,
+      autoRefresh: true,
+    });
 
   const campaigns = data?.campaigns ?? [];
 
@@ -137,6 +138,23 @@ export default function Dashboard() {
       </header>
 
       <main className="max-w-[1200px] mx-auto px-6 py-6 space-y-8">
+        {sheetConnection.status === 'error' && (
+          <div
+            className="rounded-xl border p-3 text-sm"
+            style={{ borderColor: '#fde68a', background: '#fffbeb', color: '#92400e' }}
+            role="status"
+          >
+            <p className="font-medium">Google Sheet not applied</p>
+            <p className="text-xs mt-1 opacity-90">
+              The app could not read CSV from your sheet ({sheetConnection.error}). Use{' '}
+              <strong>Share → Anyone with the link → Viewer</strong>, confirm{' '}
+              <code className="text-[11px]">GOOGLE_SHEET_ID</code> or{' '}
+              <code className="text-[11px]">GOOGLE_SHEET_CSV_URL</code> in Vercel, then redeploy.
+              Until then, spend / balance / link clicks use Meta (or env overrides).
+            </p>
+          </div>
+        )}
+
         {error && (
           <div
             className="rounded-xl border p-4 flex items-center gap-3"

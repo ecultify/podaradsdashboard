@@ -1,8 +1,8 @@
 import { NextRequest, NextResponse } from 'next/server';
 import MetaApiClient from '@/lib/meta-api';
-import { getMergedDisplayOverrides } from '@/lib/display-overrides';
+import { getRawDisplayOverrides, finalizeDisplayOverrides } from '@/lib/display-overrides';
 import { ApiResponse, DashboardData } from '@/types/meta';
-import type { DisplayOverridesPayload } from '@/types/display';
+import type { DisplayOverridesPayload, SheetConnectionMeta } from '@/types/display';
 
 export const dynamic = 'force-dynamic';
 
@@ -17,12 +17,17 @@ export async function GET(request: NextRequest) {
     const client = new MetaApiClient();
     const data = await client.getDashboardData(datePreset, campaignId);
 
-    const displayOverrides: DisplayOverridesPayload = getMergedDisplayOverrides();
+    const { raw, sheetMeta } = await getRawDisplayOverrides();
+    const displayOverrides: DisplayOverridesPayload = finalizeDisplayOverrides(data, raw);
 
-    const response: ApiResponse<DashboardData> & { displayOverrides: DisplayOverridesPayload } = {
+    const response: ApiResponse<DashboardData> & {
+      displayOverrides: DisplayOverridesPayload;
+      sheetConnection: SheetConnectionMeta;
+    } = {
       success: true,
       data,
       displayOverrides,
+      sheetConnection: sheetMeta,
     };
 
     return NextResponse.json(response);

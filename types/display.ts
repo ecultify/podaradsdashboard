@@ -3,4 +3,11 @@ export type DisplayOverridesPayload = {
   amountSpent?: number;
   balanceLeft?: number;
   linkClicks?: number;
+  /** Total budget / “total amount” when using sheet-driven balance (balance = total − spent). */
+  totalAmount?: number;
 };
+
+export type SheetConnectionMeta =
+  | { status: 'disabled' }
+  | { status: 'ok' }
+  | { status: 'error'; error: string };

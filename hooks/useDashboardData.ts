@@ -2,7 +2,7 @@
 
 import { useState, useEffect, useCallback } from 'react';
 import { DashboardData } from '@/types/meta';
-import type { DisplayOverridesPayload } from '@/types/display';
+import type { DisplayOverridesPayload, SheetConnectionMeta } from '@/types/display';
 
 interface UseDashboardDataOptions {
   datePreset?: string;
@@ -14,6 +14,7 @@ interface UseDashboardDataOptions {
 interface UseDashboardDataReturn {
   data: DashboardData | null;
   displayOverrides: DisplayOverridesPayload;
+  sheetConnection: SheetConnectionMeta;
   loading: boolean;
   error: string | null;
   refresh: () => Promise<void>;
@@ -30,6 +31,7 @@ export function useDashboardData(options: UseDashboardDataOptions = {}): UseDash
 
   const [data, setData] = useState<DashboardData | null>(null);
   const [displayOverrides, setDisplayOverrides] = useState<DisplayOverridesPayload>({});
+  const [sheetConnection, setSheetConnection] = useState<SheetConnectionMeta>({ status: 'disabled' });
   const [loading, setLoading] = useState(true);
   const [error, setError] = useState<string | null>(null);
   const [lastRefreshed, setLastRefreshed] = useState<Date | null>(null);
@@ -49,6 +51,7 @@ export function useDashboardData(options: UseDashboardDataOptions = {}): UseDash
         error?: string;
         data?: DashboardData;
         displayOverrides?: DisplayOverridesPayload;
+        sheetConnection?: SheetConnectionMeta;
       };
       try {
         result = JSON.parse(raw) as typeof result;
@@ -64,6 +67,7 @@ export function useDashboardData(options: UseDashboardDataOptions = {}): UseDash
 
       setData(result.data);
       setDisplayOverrides(result.displayOverrides ?? {});
+      setSheetConnection(result.sheetConnection ?? { status: 'disabled' });
       setLastRefreshed(new Date());
     } catch (err: unknown) {
       setError(err instanceof Error ? err.message : 'An error occurred');
@@ -82,5 +86,5 @@ export function useDashboardData(options: UseDashboardDataOptions = {}): UseDash
     return () => clearInterval(interval);
   }, [fetchData, refreshInterval, autoRefresh]);
 
-  return { data, displayOverrides, loading, error, refresh: fetchData, lastRefreshed };
+  return { data, displayOverrides, sheetConnection, loading, error, refresh: fetchData, lastRefreshed };
 }
