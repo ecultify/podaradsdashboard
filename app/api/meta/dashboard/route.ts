@@ -1,6 +1,8 @@
 import { NextRequest, NextResponse } from 'next/server';
 import MetaApiClient from '@/lib/meta-api';
+import { getMergedDisplayOverrides } from '@/lib/display-overrides';
 import { ApiResponse, DashboardData } from '@/types/meta';
+import type { DisplayOverridesPayload } from '@/types/display';
 
 export const dynamic = 'force-dynamic';
 
@@ -15,9 +17,12 @@ export async function GET(request: NextRequest) {
     const client = new MetaApiClient();
     const data = await client.getDashboardData(datePreset, campaignId);
 
-    const response: ApiResponse<DashboardData> = {
+    const displayOverrides: DisplayOverridesPayload = getMergedDisplayOverrides();
+
+    const response: ApiResponse<DashboardData> & { displayOverrides: DisplayOverridesPayload } = {
       success: true,
       data,
+      displayOverrides,
     };
 
     return NextResponse.json(response);

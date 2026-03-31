@@ -2,6 +2,7 @@
 
 import { useState, useEffect, useCallback } from 'react';
 import { DashboardData } from '@/types/meta';
+import type { DisplayOverridesPayload } from '@/types/display';
 
 interface UseDashboardDataOptions {
   datePreset?: string;
@@ -12,6 +13,7 @@ interface UseDashboardDataOptions {
 
 interface UseDashboardDataReturn {
   data: DashboardData | null;
+  displayOverrides: DisplayOverridesPayload;
   loading: boolean;
   error: string | null;
   refresh: () => Promise<void>;
@@ -27,6 +29,7 @@ export function useDashboardData(options: UseDashboardDataOptions = {}): UseDash
   } = options;
 
   const [data, setData] = useState<DashboardData | null>(null);
+  const [displayOverrides, setDisplayOverrides] = useState<DisplayOverridesPayload>({});
   const [loading, setLoading] = useState(true);
   const [error, setError] = useState<string | null>(null);
   const [lastRefreshed, setLastRefreshed] = useState<Date | null>(null);
@@ -41,7 +44,12 @@ export function useDashboardData(options: UseDashboardDataOptions = {}): UseDash
 
       const response = await fetch(`/api/meta/dashboard?${params}`);
       const raw = await response.text();
-      let result: { success?: boolean; error?: string; data?: DashboardData };
+      let result: {
+        success?: boolean;
+        error?: string;
+        data?: DashboardData;
+        displayOverrides?: DisplayOverridesPayload;
+      };
       try {
         result = JSON.parse(raw) as typeof result;
       } catch {
@@ -55,6 +63,7 @@ export function useDashboardData(options: UseDashboardDataOptions = {}): UseDash
       if (!result.data) throw new Error('Dashboard returned no data');
 
       setData(result.data);
+      setDisplayOverrides(result.displayOverrides ?? {});
       setLastRefreshed(new Date());
     } catch (err: unknown) {
       setError(err instanceof Error ? err.message : 'An error occurred');
@@ -73,5 +82,5 @@ export function useDashboardData(options: UseDashboardDataOptions = {}): UseDash
     return () => clearInterval(interval);
   }, [fetchData, refreshInterval, autoRefresh]);
 
-  return { data, loading, error, refresh: fetchData, lastRefreshed };
+  return { data, displayOverrides, loading, error, refresh: fetchData, lastRefreshed };
 }

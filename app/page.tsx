@@ -6,6 +6,7 @@ import {
   DASHBOARD_BRAND_LETTER,
   DASHBOARD_TITLE,
   SPEND_MULTIPLIER,
+  TEST_TAKERS_COUNT,
   TOTAL_BUDGET,
 } from '@/lib/dashboard-config';
 import {
@@ -18,7 +19,7 @@ import {
 const REFRESH_INTERVAL_SEC = Number(process.env.NEXT_PUBLIC_REFRESH_INTERVAL ?? 300);
 
 export default function Dashboard() {
-  const { data, loading, error, refresh, lastRefreshed } = useDashboardData({
+  const { data, displayOverrides, loading, error, refresh, lastRefreshed } = useDashboardData({
     datePreset: 'maximum',
     refreshInterval: REFRESH_INTERVAL_SEC,
     autoRefresh: true,
@@ -27,8 +28,8 @@ export default function Dashboard() {
   const campaigns = data?.campaigns ?? [];
 
   /**
-   * Performance KPI “Link clicks” = sum of `link_click` actions from Insights (`engagement.linkClicks`),
-   * matching Ads Manager → Columns: Engagement → “Link clicks”. Not Meta’s generic `clicks` field.
+   * Meta-derived totals. “Link clicks” = `link_click` actions (`engagement.linkClicks`).
+   * Amount spent / balance / link clicks on the page can be overridden via manual values (see API).
    */
   const totals = useMemo(() => {
     const spend = campaigns.reduce((s, c) => s + c.totalSpend, 0);
@@ -59,10 +60,15 @@ export default function Dashboard() {
     };
   }, [campaigns]);
 
+  const display = useMemo(() => {
+    const amountSpent = displayOverrides.amountSpent ?? totals.spend;
+    const balanceLeft = displayOverrides.balanceLeft ?? totals.balanceLeft;
+    const linkClicks = displayOverrides.linkClicks ?? totals.linkClicks;
+    const linkCtr = totals.impressions > 0 ? (linkClicks / totals.impressions) * 100 : 0;
+    return { amountSpent, balanceLeft, linkClicks, linkCtr };
+  }, [displayOverrides, totals]);
+
   const currency = data?.account?.currency || 'INR';
-  const lb = data?.leadsBreakdown ?? { total: 0, vote: 0, shareYourKissa: 0, guessTheColony: 0 };
-  const dm = data?.dmConversations ?? { whatsapp: 0, instagram: 0 };
-  const messagingDmsTotal = dm.whatsapp + dm.instagram;
 
   const engagementRows = [
     { category: 'Page Engagement', value: totals.pageEngagement },
@@ -70,10 +76,8 @@ export default function Dashboard() {
     { category: 'Post Comments', value: totals.postComments },
     { category: 'Post Saves', value: totals.postSaves },
     { category: 'Post Shares', value: totals.postShares },
-    { category: 'Link Clicks', value: totals.linkClicks },
+    { category: 'Link Clicks', value: display.linkClicks },
   ];
-
-  const websiteLeadsRows = [{ category: 'Website leads', value: lb.total }];
 
   return (
     <div className="min-h-screen" style={{ background: '#f8fafc' }}>
@@ -161,93 +165,50 @@ export default function Dashboard() {
         )}
 
         <Section title="Spend Overview">
-          <KPICard label="Amount Spent" value={formatCurrency(totals.spend, currency)} accent="#3b82f6" />
-          <KPICard label="Balance Left" value={formatCurrency(totals.balanceLeft, currency)} accent="#d97706" />
+          <KPICard label="Amount Spent" value={formatCurrency(display.amountSpent, currency)} accent="#3b82f6" />
+          <KPICard label="Balance Left" value={formatCurrency(display.balanceLeft, currency)} accent="#d97706" />
         </Section>
 
         <Section title="Performance">
-          <KPICard label="Total Leads" value={formatNumber(lb.total + messagingDmsTotal)} accent="#10b981" />
+          <KPICard label="Test takers" value={formatNumber(TEST_TAKERS_COUNT)} accent="#10b981" />
           <KPICard label="Reach" value={formatNumber(totals.reach)} accent="#7c3aed" />
           <KPICard label="Impressions" value={formatNumber(totals.impressions)} accent="#8b5cf6" />
-          <KPICard label="Link clicks" value={formatNumber(totals.linkClicks)} accent="#ec4899" />
-          <KPICard label="Link CTR" value={formatPercent(totals.linkCtr)} accent="#0891b2" />
+          <KPICard label="Link clicks" value={formatNumber(display.linkClicks)} accent="#ec4899" />
+          <KPICard label="Link CTR" value={formatPercent(display.linkCtr)} accent="#0891b2" />
         </Section>
 
-        <div className="grid grid-cols-1 md:grid-cols-2 gap-6">
-          <div>
-            <h2 className="text-xs uppercase tracking-wider font-semibold mb-3" style={{ color: '#9ca3af' }}>
-              Engagement Breakdown
-            </h2>
-            <div className="rounded-xl border overflow-hidden shadow-sm" style={{ borderColor: '#e5e7eb', background: '#fff' }}>
-              <table className="w-full text-sm">
-                <thead>
-                  <tr style={{ borderBottom: '1px solid #e5e7eb', background: '#f9fafb' }}>
-                    <th className="px-4 py-2.5 text-left text-xs font-medium" style={{ color: '#9ca3af' }}>
-                      Category
-                    </th>
-                    <th className="px-4 py-2.5 text-right text-xs font-medium" style={{ color: '#9ca3af' }}>
-                      Value
-                    </th>
+        <div>
+          <h2 className="text-xs uppercase tracking-wider font-semibold mb-3" style={{ color: '#9ca3af' }}>
+            Engagement Breakdown
+          </h2>
+          <div className="rounded-xl border overflow-hidden shadow-sm w-full" style={{ borderColor: '#e5e7eb', background: '#fff' }}>
+            <table className="w-full text-sm">
+              <thead>
+                <tr style={{ borderBottom: '1px solid #e5e7eb', background: '#f9fafb' }}>
+                  <th className="px-4 py-2.5 text-left text-xs font-medium" style={{ color: '#9ca3af' }}>
+                    Category
+                  </th>
+                  <th className="px-4 py-2.5 text-right text-xs font-medium" style={{ color: '#9ca3af' }}>
+                    Value
+                  </th>
+                </tr>
+              </thead>
+              <tbody>
+                {engagementRows.map((row) => (
+                  <tr key={row.category} style={{ borderBottom: '1px solid #f3f4f6' }}>
+                    <td className="px-4 py-2.5 text-xs" style={{ color: '#374151' }}>
+                      {row.category}
+                    </td>
+                    <td
+                      className="px-4 py-2.5 text-right text-xs font-semibold"
+                      style={{ color: '#111827', fontFamily: "'JetBrains Mono', monospace" }}
+                    >
+                      {formatNumber(row.value)}
+                    </td>
                   </tr>
-                </thead>
-                <tbody>
-                  {engagementRows.map((row) => (
-                    <tr key={row.category} style={{ borderBottom: '1px solid #f3f4f6' }}>
-                      <td className="px-4 py-2.5 text-xs" style={{ color: '#374151' }}>
-                        {row.category}
-                      </td>
-                      <td
-                        className="px-4 py-2.5 text-right text-xs font-semibold"
-                        style={{ color: '#111827', fontFamily: "'JetBrains Mono', monospace" }}
-                      >
-                        {formatNumber(row.value)}
-                      </td>
-                    </tr>
-                  ))}
-                </tbody>
-              </table>
-            </div>
-          </div>
-
-          <div>
-            <h2 className="text-xs uppercase tracking-wider font-semibold mb-3" style={{ color: '#9ca3af' }}>
-              Leads Breakdown
-            </h2>
-            <div className="rounded-xl border overflow-hidden shadow-sm mb-4" style={{ borderColor: '#e5e7eb', background: '#fff' }}>
-              <table className="w-full text-sm">
-                <thead>
-                  <tr style={{ borderBottom: '1px solid #e5e7eb', background: '#f9fafb' }}>
-                    <th className="px-4 py-2.5 text-left text-xs font-medium" style={{ color: '#9ca3af' }}>
-                      Category
-                    </th>
-                    <th className="px-4 py-2.5 text-right text-xs font-medium" style={{ color: '#9ca3af' }}>
-                      Value
-                    </th>
-                  </tr>
-                </thead>
-                <tbody>
-                  {websiteLeadsRows.map((row) => (
-                    <tr key={row.category}>
-                      <td className="px-4 py-2.5 text-xs" style={{ color: '#374151' }}>
-                        {row.category}
-                      </td>
-                      <td
-                        className="px-4 py-2.5 text-right text-xs font-semibold"
-                        style={{ color: '#111827', fontFamily: "'JetBrains Mono', monospace" }}
-                      >
-                        {formatNumber(row.value)}
-                      </td>
-                    </tr>
-                  ))}
-                </tbody>
-              </table>
-            </div>
-            <KPICard
-              label="Messaging DMs"
-              value={formatNumber(messagingDmsTotal)}
-              accent="#25d366"
-              subtitle="Conversations started (WhatsApp + Instagram)"
-            />
+                ))}
+              </tbody>
+            </table>
           </div>
         </div>
 
