@@ -6,7 +6,7 @@ export const DASHBOARD_BRAND_LETTER = 'D';
 /** Header: main title */
 export const DASHBOARD_TITLE = 'Destress Dashboard';
 
-/** Performance KPI — fixed display number (not from Meta). Adjust here when the count changes. */
+/** Performance KPI — fixed display number (not from Meta). Adjust here when the count changes.1 */
 export const TEST_TAKERS_COUNT =9516;
 
 /**
