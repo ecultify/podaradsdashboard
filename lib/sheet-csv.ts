@@ -30,6 +30,7 @@ export type SheetKpiRow = {
   totalAmount?: number;
   amountSpent?: number;
   linkClicks?: number;
+  testTakers?: number;
 };
 
 /**
@@ -70,6 +71,8 @@ export function parseKpiSheetCsv(csv: string): SheetKpiRow {
       out.amountSpent = val;
     } else if (key === 'link_clicks' || key === 'linkclicks') {
       out.linkClicks = val;
+    } else if (key === 'test_takers' || key === 'testtakers') {
+      out.testTakers = val;
     }
   }
   return out;
@@ -96,7 +99,7 @@ function isProbablyHtml(text: string): boolean {
 
 function hasParsedValues(row: SheetKpiRow): boolean {
   return (
-    row.totalAmount !== undefined || row.amountSpent !== undefined || row.linkClicks !== undefined
+    row.totalAmount !== undefined || row.amountSpent !== undefined || row.linkClicks !== undefined || row.testTakers !== undefined
   );
 }
 

@@ -66,7 +66,8 @@ export default function Dashboard() {
     const balanceLeft = displayOverrides.balanceLeft ?? totals.balanceLeft;
     const linkClicks = displayOverrides.linkClicks ?? totals.linkClicks;
     const linkCtr = totals.impressions > 0 ? (linkClicks / totals.impressions) * 100 : 0;
-    return { amountSpent, balanceLeft, linkClicks, linkCtr };
+    const testTakers = displayOverrides.testTakers ?? TEST_TAKERS_COUNT;
+    return { amountSpent, balanceLeft, linkClicks, linkCtr, testTakers };
   }, [displayOverrides, totals]);
 
   const currency = data?.account?.currency || 'INR';
@@ -188,7 +189,7 @@ export default function Dashboard() {
         </Section>
 
         <Section title="Performance">
-          <KPICard label="Test takers" value={formatNumber(TEST_TAKERS_COUNT)} accent="#10b981" />
+          <KPICard label="Test takers" value={formatNumber(display.testTakers)} accent="#10b981" />
           <KPICard label="Reach" value={formatNumber(totals.reach)} accent="#7c3aed" />
           <KPICard label="Impressions" value={formatNumber(totals.impressions)} accent="#8b5cf6" />
           <KPICard label="Link clicks" value={formatNumber(display.linkClicks)} accent="#ec4899" />

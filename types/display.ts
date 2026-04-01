@@ -5,6 +5,8 @@ export type DisplayOverridesPayload = {
   linkClicks?: number;
   /** Total budget / “total amount” when using sheet-driven balance (balance = total − spent). */
   totalAmount?: number;
+  /** Test takers count from Google Sheet (overrides hardcoded constant). */
+  testTakers?: number;
 };
 
 export type SheetConnectionMeta =
