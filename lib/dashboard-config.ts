@@ -7,7 +7,7 @@ export const DASHBOARD_BRAND_LETTER = 'D';
 export const DASHBOARD_TITLE = 'Destress Dashboard';
 
 /** Performance KPI — fixed display number (not from Meta). Adjust here when the count changes. */
-export const TEST_TAKERS_COUNT = 8574;
+export const TEST_TAKERS_COUNT =9516;
 
 /**
  * Client-side spend display (optional). Set `NEXT_PUBLIC_SPEND_MULTIPLIER` / `NEXT_PUBLIC_TOTAL_BUDGET`.
