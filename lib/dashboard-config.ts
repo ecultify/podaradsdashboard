@@ -6,8 +6,8 @@ export const DASHBOARD_BRAND_LETTER = 'D';
 /** Header: main title */
 export const DASHBOARD_TITLE = 'Destress Dashboard';
 
-/** Performance KPI — fixed display number (not from Meta). Adjust here when the count changes.11 */
-export const TEST_TAKERS_COUNT =9516;
+/** Performance KPI — fallback when Google Sheet value is unavailable. Sheet value always takes priority. */
+export const TEST_TAKERS_COUNT = 0;
 
 /**
  * Client-side spend display (optional). Set `NEXT_PUBLIC_SPEND_MULTIPLIER` / `NEXT_PUBLIC_TOTAL_BUDGET`.
