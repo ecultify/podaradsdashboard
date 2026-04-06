@@ -17,6 +17,19 @@ import {
 const META_API_VERSION = 'v25.0';
 const META_BASE_URL = `https://graph.facebook.com/${META_API_VERSION}`;
 
+/** Meta returns this when the token user must complete facebook.com steps or an asset is restricted. */
+const FACEBOOK_LOGIN_CHECKPOINT =
+  /cannot access the app|log in to www\.facebook\.com/i;
+
+function formatMetaApiError(endpoint: string, apiMessage: string): string {
+  const base = `Meta API error on ${endpoint}: ${apiMessage}`;
+  if (!FACEBOOK_LOGIN_CHECKPOINT.test(apiMessage)) return base;
+  return (
+    `${base}\n\n` +
+    'What usually fixes this: (1) Log in to https://www.facebook.com with the same person who owns META_ACCESS_TOKEN and finish any security or “finish setup” prompts. (2) In https://developers.facebook.com → your app → Roles, add that user as Developer or Tester if the app is still in Development mode. (3) Check Ads Manager / Account Quality for ad account or Business restrictions, then regenerate a long-lived token after Meta clears the block.'
+  );
+}
+
 /** Delay between sequential Meta API calls (rate-limit safety net). */
 export function sleep(ms: number): Promise<void> {
   return new Promise((resolve) => setTimeout(resolve, ms));
@@ -39,17 +52,15 @@ type MetaAdRaw = {
   creative?: { id?: string; thumbnail_url?: string; name?: string };
 };
 
+/**
+ * Minimal insight fields for the dashboard: reach, impressions, spend (fallback if no Sheet),
+ * and `actions` for engagement + leads/messaging. Omits cpc/cpm/ctr/frequency/clicks to reduce payload and Graph cost.
+ */
 const INSIGHT_FIELDS_BASE = [
   'impressions',
   'reach',
   'spend',
-  'clicks',
-  'cpc',
-  'cpm',
-  'ctr',
-  'frequency',
   'actions',
-  'cost_per_action_type',
   'date_start',
   'date_stop',
 ];
@@ -107,9 +118,7 @@ class MetaApiClient {
       }
 
       const msg = errorBody?.error?.message || `${response.status} ${response.statusText}`;
-      throw new Error(
-        `Meta API error on ${endpoint}: ${msg}`
-      );
+      throw new Error(formatMetaApiError(endpoint, msg));
     }
 
     throw new Error('Meta API: exceeded rate-limit retries');
@@ -550,15 +559,6 @@ class MetaApiClient {
     return 0;
   }
 
-  /** Route ad-set name to WhatsApp vs Instagram for the conversations campaign. */
-  private classifyDestressAdsetChannel(adsetName: string): 'whatsapp' | 'instagram' {
-    const n = adsetName.toLowerCase();
-    if (n.includes('instagram') || n.includes('insta') || /\big\b/.test(n)) {
-      return 'instagram';
-    }
-    return 'whatsapp';
-  }
-
   private getPrimaryResult(
     actions: MetaAction[] | undefined,
     costActions: MetaAction[] | undefined
@@ -807,34 +807,12 @@ class MetaApiClient {
       guessTheColony: 0,
     };
 
-    const dmConversations = { whatsapp: 0, instagram: 0 };
-
-    try {
-      await sleep(200);
-      const convAdsetRows = await this.fetchAccountInsightsBatched({
-        level: 'adset',
-        fields: [...INSIGHT_FIELDS_BASE, 'campaign_id', 'adset_id', 'adset_name'].join(','),
-        date_preset: datePreset,
-        filtering: JSON.stringify([
-          { field: 'campaign.id', operator: 'IN', value: [ids.conversations] },
-        ]),
-      });
-
-      for (const row of convAdsetRows) {
-        const msg = this.getMessagingCountFromInsights(row);
-        if (msg === 0) continue;
-        const name = String((row as InsightsWithEntityIds & { adset_name?: string }).adset_name || '');
-        if (this.classifyDestressAdsetChannel(name) === 'instagram') {
-          dmConversations.instagram += msg;
-        } else {
-          dmConversations.whatsapp += msg;
-        }
-      }
-    } catch (e) {
-      console.warn('Destress conversations ad-set breakdown failed:', e);
-      const ci = campaignInsightsById.get(ids.conversations);
-      dmConversations.whatsapp = this.getMessagingCountFromInsights(ci ?? null);
-    }
+    /** Campaign-level messaging only (avoids a second adset-level insights request). */
+    const ciConv = campaignInsightsById.get(ids.conversations);
+    const dmConversations = {
+      whatsapp: this.getMessagingCountFromInsights(ciConv ?? null),
+      instagram: 0,
+    };
 
     return {
       account: {

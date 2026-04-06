@@ -16,14 +16,11 @@ import {
   timeAgo,
 } from '@/lib/formatters';
 
-const REFRESH_INTERVAL_SEC = Number(process.env.NEXT_PUBLIC_REFRESH_INTERVAL ?? 300);
-
 export default function Dashboard() {
   const { data, displayOverrides, sheetConnection, loading, error, refresh, lastRefreshed } =
     useDashboardData({
       datePreset: 'maximum',
-      refreshInterval: REFRESH_INTERVAL_SEC,
-      autoRefresh: true,
+      autoRefresh: false,
     });
 
   const campaigns = data?.campaigns ?? [];
@@ -116,7 +113,7 @@ export default function Dashboard() {
               disabled={loading}
               className="p-2 rounded-lg border transition-colors hover:bg-gray-50 disabled:opacity-50"
               style={{ borderColor: '#e5e7eb' }}
-              title="Refresh"
+              title="Reload dashboard (Meta API + Google Sheet)"
               type="button"
             >
               <svg
@@ -158,7 +155,7 @@ export default function Dashboard() {
 
         {error && (
           <div
-            className="rounded-xl border p-4 flex items-center gap-3"
+            className="rounded-xl border p-4 flex items-start gap-3"
             style={{ borderColor: '#fecaca', background: '#fef2f2' }}
           >
             <svg className="w-5 h-5 text-red-500 flex-shrink-0" fill="none" viewBox="0 0 24 24" stroke="currentColor">
@@ -171,7 +168,7 @@ export default function Dashboard() {
             </svg>
             <div>
               <p className="text-sm font-medium text-red-700">API Error</p>
-              <p className="text-xs text-red-500 mt-0.5">{error}</p>
+              <p className="text-xs text-red-500 mt-0.5 whitespace-pre-wrap break-words">{error}</p>
             </div>
             <button
               onClick={() => refresh()}

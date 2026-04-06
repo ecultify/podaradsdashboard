@@ -8,6 +8,7 @@ interface UseDashboardDataOptions {
   datePreset?: string;
   campaignId?: string;
   refreshInterval?: number;
+  /** When true, polls on an interval. Default false: load once, then only when `refresh()` runs (e.g. header button). */
   autoRefresh?: boolean;
 }
 
@@ -26,7 +27,7 @@ export function useDashboardData(options: UseDashboardDataOptions = {}): UseDash
     datePreset = 'maximum',
     campaignId,
     refreshInterval = 300,
-    autoRefresh = true,
+    autoRefresh = false,
   } = options;
 
   const [data, setData] = useState<DashboardData | null>(null);
