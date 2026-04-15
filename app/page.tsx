@@ -1,7 +1,8 @@
 'use client';
 
-import { useMemo } from 'react';
+import { useMemo, useState } from 'react';
 import { useDashboardData } from '@/hooks/useDashboardData';
+import { useSpendsTable } from '@/hooks/useSpendsTable';
 import {
   DASHBOARD_BRAND_LETTER,
   DASHBOARD_TITLE,
@@ -16,12 +17,18 @@ import {
   timeAgo,
 } from '@/lib/formatters';
 
+type TabKey = 'overview' | 'spends';
+
 export default function Dashboard() {
+  const [activeTab, setActiveTab] = useState<TabKey>('overview');
+
   const { data, displayOverrides, sheetConnection, loading, error, refresh, lastRefreshed } =
     useDashboardData({
       datePreset: 'maximum',
       autoRefresh: false,
     });
+
+  const spends = useSpendsTable(activeTab === 'spends');
 
   const campaigns = data?.campaigns ?? [];
 
@@ -136,6 +143,25 @@ export default function Dashboard() {
       </header>
 
       <main className="max-w-[1200px] mx-auto px-6 py-6 space-y-8">
+        <div className="flex items-center gap-1 border-b" style={{ borderColor: '#e5e7eb' }}>
+          <TabButton active={activeTab === 'overview'} onClick={() => setActiveTab('overview')}>
+            Overview
+          </TabButton>
+          <TabButton active={activeTab === 'spends'} onClick={() => setActiveTab('spends')}>
+            TOI D-stress spends
+          </TabButton>
+        </div>
+
+        {activeTab === 'spends' && (
+          <SpendsTab
+            data={spends.data}
+            loading={spends.loading}
+            error={spends.error}
+            onRefresh={spends.refresh}
+          />
+        )}
+
+        {activeTab === 'overview' && <>
         {sheetConnection.status === 'error' && (
           <div
             className="rounded-xl border p-3 text-sm"
@@ -238,6 +264,7 @@ export default function Dashboard() {
             ))}
           </div>
         )}
+        </>}
       </main>
     </div>
   );
@@ -250,6 +277,274 @@ function Section({ title, children }: { title: string; children: React.ReactNode
         {title}
       </h2>
       <div className="grid grid-cols-2 md:grid-cols-3 lg:grid-cols-4 gap-4 stagger-children">{children}</div>
+    </div>
+  );
+}
+
+function TabButton({
+  active,
+  onClick,
+  children,
+}: {
+  active: boolean;
+  onClick: () => void;
+  children: React.ReactNode;
+}) {
+  return (
+    <button
+      type="button"
+      onClick={onClick}
+      className="relative px-4 py-2.5 text-sm font-medium transition-colors"
+      style={{
+        color: active ? '#111827' : '#6b7280',
+      }}
+    >
+      {children}
+      {active && (
+        <span
+          className="absolute left-0 right-0 -bottom-px h-0.5"
+          style={{ background: '#3b82f6' }}
+        />
+      )}
+    </button>
+  );
+}
+
+/** Columns whose values should render right-aligned as numbers / currency. */
+const NUMERIC_HEADER_PATTERNS = [
+  /amount/i,
+  /spent/i,
+  /spend/i,
+  /impressions?/i,
+  /reach/i,
+  /engagement/i,
+  /leads?/i,
+  /clicks?/i,
+  /ctr/i,
+  /cpl/i,
+  /cpm/i,
+  /cpc/i,
+  /cost/i,
+  /frequency/i,
+  /budget/i,
+];
+
+const CURRENCY_HEADER_PATTERNS = [/amount/i, /spent/i, /spend/i, /cpl/i, /cpm/i, /cpc/i, /cost/i, /budget/i];
+const PERCENT_HEADER_PATTERNS = [/ctr/i, /rate/i];
+
+function isUrl(v: string): boolean {
+  return /^https?:\/\//i.test(v.trim());
+}
+
+function headerMatches(header: string, patterns: RegExp[]): boolean {
+  return patterns.some((re) => re.test(header));
+}
+
+function formatCellValue(header: string, value: string): string {
+  const v = value.trim();
+  if (!v) return '';
+  if (isUrl(v)) return v;
+  const numeric = Number(v.replace(/,/g, '').replace(/[₹$]/g, '').replace(/%/g, ''));
+  if (!Number.isFinite(numeric)) return v;
+
+  if (headerMatches(header, PERCENT_HEADER_PATTERNS)) {
+    return `${numeric.toLocaleString('en-IN', { maximumFractionDigits: 2 })}%`;
+  }
+  if (headerMatches(header, CURRENCY_HEADER_PATTERNS)) {
+    return `₹${numeric.toLocaleString('en-IN', { maximumFractionDigits: 2 })}`;
+  }
+  if (headerMatches(header, NUMERIC_HEADER_PATTERNS)) {
+    return numeric.toLocaleString('en-IN');
+  }
+  return v;
+}
+
+function SpendsTab({
+  data,
+  loading,
+  error,
+  onRefresh,
+}: {
+  data: { headers: string[]; rows: string[][] } | null;
+  loading: boolean;
+  error: string | null;
+  onRefresh: () => Promise<void>;
+}) {
+  if (loading && !data) {
+    return (
+      <div
+        className="rounded-xl border p-8 text-sm"
+        style={{ borderColor: '#e5e7eb', background: '#fff', color: '#6b7280' }}
+      >
+        Loading…
+      </div>
+    );
+  }
+
+  if (error && !data) {
+    return (
+      <div
+        className="rounded-xl border p-4 flex items-start gap-3"
+        style={{ borderColor: '#fecaca', background: '#fef2f2' }}
+      >
+        <div className="flex-1">
+          <p className="text-sm font-medium text-red-700">Could not load spends table</p>
+          <p className="text-xs text-red-500 mt-0.5 whitespace-pre-wrap break-words">{error}</p>
+          <p className="text-xs text-red-500 mt-2">
+            Check <code>GOOGLE_SPENDS_SHEET_ID</code> and <code>GOOGLE_SPENDS_SHEET_GID</code> in
+            your env, and ensure the sheet is shared as <strong>Anyone with the link → Viewer</strong>.
+          </p>
+        </div>
+        <button
+          onClick={() => onRefresh()}
+          type="button"
+          className="text-xs px-3 py-1.5 rounded-md bg-red-50 text-red-600 border border-red-200 hover:bg-red-100 transition"
+        >
+          Retry
+        </button>
+      </div>
+    );
+  }
+
+  if (!data || data.rows.length === 0) {
+    return (
+      <div
+        className="rounded-xl border p-8 text-sm text-center"
+        style={{ borderColor: '#e5e7eb', background: '#fff', color: '#6b7280' }}
+      >
+        No spends data yet. Paste a table into the{' '}
+        <strong>TOI_destress_spends</strong> tab of the value updater sheet.
+      </div>
+    );
+  }
+
+  const { headers, rows } = data;
+  const numericColumnFlags = headers.map((h) => headerMatches(h, NUMERIC_HEADER_PATTERNS));
+
+  return (
+    <div>
+      <div className="flex items-center justify-between mb-3">
+        <h2 className="text-xs uppercase tracking-wider font-semibold" style={{ color: '#9ca3af' }}>
+          TOI D-stress spends
+        </h2>
+        <button
+          type="button"
+          onClick={() => onRefresh()}
+          disabled={loading}
+          className="text-xs px-3 py-1.5 rounded-md border transition hover:bg-gray-50 disabled:opacity-50"
+          style={{ borderColor: '#e5e7eb', color: '#6b7280' }}
+        >
+          {loading ? 'Refreshing…' : 'Refresh'}
+        </button>
+      </div>
+      <div
+        className="rounded-xl border overflow-x-auto shadow-sm"
+        style={{ borderColor: '#e5e7eb', background: '#fff' }}
+      >
+        <table className="w-full text-sm">
+          <thead>
+            <tr style={{ borderBottom: '1px solid #e5e7eb', background: '#f9fafb' }}>
+              {headers.map((h, i) => (
+                <th
+                  key={`${h}-${i}`}
+                  className={`px-4 py-2.5 text-xs font-medium whitespace-nowrap ${
+                    numericColumnFlags[i] ? 'text-right' : 'text-left'
+                  }`}
+                  style={{ color: '#9ca3af' }}
+                >
+                  {h || ''}
+                </th>
+              ))}
+            </tr>
+          </thead>
+          <tbody>
+            {rows.map((row, rIdx) => {
+              const nonEmptyCount = row.filter((c) => c.trim().length > 0).length;
+              // Render single-cell rows as a spanning section header.
+              if (nonEmptyCount === 1) {
+                const label = row.find((c) => c.trim().length > 0) ?? '';
+                return (
+                  <tr key={rIdx} style={{ background: '#f3f4f6' }}>
+                    <td
+                      colSpan={headers.length}
+                      className="px-4 py-2 text-xs font-semibold uppercase tracking-wider"
+                      style={{ color: '#374151' }}
+                    >
+                      {label}
+                    </td>
+                  </tr>
+                );
+              }
+              return (
+                <tr key={rIdx} style={{ borderBottom: '1px solid #f3f4f6' }}>
+                  {headers.map((h, cIdx) => {
+                    const raw = row[cIdx] ?? '';
+                    const numeric = numericColumnFlags[cIdx];
+                    // Split cell on newlines so multi-value cells (e.g. multiple
+                    // Creative URLs pasted into one cell) render as a stacked list.
+                    const parts = raw
+                      .split(/\r?\n/)
+                      .map((p) => p.trim())
+                      .filter((p) => p.length > 0);
+                    const allLinks = parts.length > 0 && parts.every((p) => isUrl(p));
+                    return (
+                      <td
+                        key={`${rIdx}-${cIdx}`}
+                        className={`px-4 py-2.5 text-xs align-top ${
+                          numeric ? 'text-right whitespace-nowrap' : 'text-left'
+                        }`}
+                        style={{
+                          color: numeric ? '#111827' : '#374151',
+                          fontFamily: numeric
+                            ? "'JetBrains Mono', monospace"
+                            : "'Outfit', system-ui, sans-serif",
+                          fontWeight: numeric ? 600 : 400,
+                        }}
+                      >
+                        {parts.length === 0 ? (
+                          ''
+                        ) : allLinks ? (
+                          <div className="flex flex-col gap-0.5">
+                            {parts.map((p, idx) => (
+                              <a
+                                key={idx}
+                                href={p}
+                                target="_blank"
+                                rel="noopener noreferrer"
+                                className="underline hover:no-underline"
+                                style={{
+                                  color: '#3b82f6',
+                                  fontFamily: "'Outfit', system-ui, sans-serif",
+                                  fontWeight: 400,
+                                  fontSize: '0.75rem',
+                                  letterSpacing: 'normal',
+                                  fontStyle: 'normal',
+                                  fontVariant: 'normal',
+                                  textRendering: 'auto',
+                                }}
+                              >
+                                View{parts.length > 1 ? ` ${idx + 1}` : ''}
+                              </a>
+                            ))}
+                          </div>
+                        ) : parts.length === 1 ? (
+                          formatCellValue(h, parts[0])
+                        ) : (
+                          <div className="flex flex-col gap-0.5">
+                            {parts.map((p, idx) => (
+                              <span key={idx}>{formatCellValue(h, p)}</span>
+                            ))}
+                          </div>
+                        )}
+                      </td>
+                    );
+                  })}
+                </tr>
+              );
+            })}
+          </tbody>
+        </table>
+      </div>
     </div>
   );
 }
