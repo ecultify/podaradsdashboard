@@ -236,12 +236,20 @@ class MetaApiClient {
     conversations: string;
     websiteLeads: string;
     linkClicks: string;
+    extra: string[];
   } | null {
     const conversations = process.env.META_CAMPAIGN_ID_CONVERSATIONS?.trim();
     const websiteLeads = process.env.META_CAMPAIGN_ID_WEBSITE_LEADS?.trim();
     const linkClicks = process.env.META_CAMPAIGN_ID_LINK_CLICKS?.trim();
+    const extraRaw = process.env.META_CAMPAIGN_IDS_EXTRA?.trim();
+    const extra = extraRaw
+      ? extraRaw
+          .split(',')
+          .map((id) => id.trim())
+          .filter((id) => id.length > 0)
+      : [];
     if (conversations && websiteLeads && linkClicks) {
-      return { conversations, websiteLeads, linkClicks };
+      return { conversations, websiteLeads, linkClicks, extra };
     }
     return null;
   }
@@ -708,15 +716,20 @@ class MetaApiClient {
   /** Destress: fixed three campaigns — aggregate KPIs; leads from website-leads ID; DMs from conversations ID (ad set names). */
   private async getDashboardDataDestress(
     datePreset: string,
-    ids: { conversations: string; websiteLeads: string; linkClicks: string }
+    ids: { conversations: string; websiteLeads: string; linkClicks: string; extra: string[] }
   ): Promise<DashboardData> {
     const account = await this.getAdAccount();
     await sleep(100);
 
-    const [cConv, cLeads, cLink] = await Promise.all([
+    const extraIds = (ids.extra || []).filter(
+      (id) => id !== ids.conversations && id !== ids.websiteLeads && id !== ids.linkClicks
+    );
+
+    const [cConv, cLeads, cLink, ...cExtras] = await Promise.all([
       this.fetchCampaignById(ids.conversations),
       this.fetchCampaignById(ids.websiteLeads),
       this.fetchCampaignById(ids.linkClicks),
+      ...extraIds.map((id) => this.fetchCampaignById(id)),
     ]);
 
     if (!cConv || !cLeads || !cLink) {
@@ -730,7 +743,8 @@ class MetaApiClient {
       );
     }
 
-    const campaigns: Campaign[] = [cConv, cLeads, cLink];
+    const validExtras = cExtras.filter((c): c is Campaign => !!c);
+    const campaigns: Campaign[] = [cConv, cLeads, cLink, ...validExtras];
     const campaignIds = campaigns.map((c) => c.id);
     const nameFilter = this.getCampaignNameFilterFromEnv();
 
