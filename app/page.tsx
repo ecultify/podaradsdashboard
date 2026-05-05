@@ -218,7 +218,7 @@ export default function Dashboard() {
           <KPICard label="Test takers" value={formatNumber(display.testTakers)} accent="#10b981" />
           <KPICard label="Reach" value={formatNumber(display.reach)} accent="#7c3aed" />
           <KPICard label="Impressions" value={formatNumber(display.combinedImpressions)} accent="#8b5cf6" />
-          <KPICard label="Google Ads" value={formatNumber(display.googleAds)} accent="#f59e0b" />
+          <KPICard label="Google Ads Impressions" value={formatNumber(display.googleAds)} accent="#f59e0b" />
           <KPICard label="Link clicks" value={formatNumber(display.linkClicks)} accent="#ec4899" />
           <KPICard label="Link CTR" value={formatPercent(display.linkCtr)} accent="#0891b2" />
         </Section>
