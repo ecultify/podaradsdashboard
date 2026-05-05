@@ -32,6 +32,7 @@ export type SheetKpiRow = {
   linkClicks?: number;
   testTakers?: number;
   googleAds?: number;
+  reach?: number;
 };
 
 /**
@@ -76,6 +77,8 @@ export function parseKpiSheetCsv(csv: string): SheetKpiRow {
       out.testTakers = val;
     } else if (key === 'google_ads' || key === 'googleads') {
       out.googleAds = val;
+    } else if (key === 'reach') {
+      out.reach = val;
     }
   }
   return out;
@@ -106,7 +109,8 @@ function hasParsedValues(row: SheetKpiRow): boolean {
     row.amountSpent !== undefined ||
     row.linkClicks !== undefined ||
     row.testTakers !== undefined ||
-    row.googleAds !== undefined
+    row.googleAds !== undefined ||
+    row.reach !== undefined
   );
 }
 

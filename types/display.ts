@@ -9,6 +9,8 @@ export type DisplayOverridesPayload = {
   testTakers?: number;
   /** Google Ads impressions from Google Sheet — added to Meta impressions for CTR. */
   googleAds?: number;
+  /** Reach from Google Sheet — overrides Meta-derived reach total. */
+  reach?: number;
 };
 
 export type SheetConnectionMeta =
