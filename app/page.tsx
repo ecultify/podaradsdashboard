@@ -69,9 +69,11 @@ export default function Dashboard() {
     const amountSpent = displayOverrides.amountSpent ?? totals.spend;
     const balanceLeft = displayOverrides.balanceLeft ?? totals.balanceLeft;
     const linkClicks = displayOverrides.linkClicks ?? totals.linkClicks;
-    const linkCtr = totals.impressions > 0 ? (linkClicks / totals.impressions) * 100 : 0;
+    const googleAds = displayOverrides.googleAds ?? 0;
+    const combinedImpressions = totals.impressions + googleAds;
+    const linkCtr = combinedImpressions > 0 ? (linkClicks / combinedImpressions) * 100 : 0;
     const testTakers = displayOverrides.testTakers ?? TEST_TAKERS_COUNT;
-    return { amountSpent, balanceLeft, linkClicks, linkCtr, testTakers };
+    return { amountSpent, balanceLeft, linkClicks, linkCtr, testTakers, googleAds, combinedImpressions };
   }, [displayOverrides, totals]);
 
   const currency = data?.account?.currency || 'INR';
@@ -214,7 +216,8 @@ export default function Dashboard() {
         <Section title="Performance">
           <KPICard label="Test takers" value={formatNumber(display.testTakers)} accent="#10b981" />
           <KPICard label="Reach" value={formatNumber(totals.reach)} accent="#7c3aed" />
-          <KPICard label="Impressions" value={formatNumber(totals.impressions)} accent="#8b5cf6" />
+          <KPICard label="Impressions" value={formatNumber(display.combinedImpressions)} accent="#8b5cf6" />
+          <KPICard label="Google Ads" value={formatNumber(display.googleAds)} accent="#f59e0b" />
           <KPICard label="Link clicks" value={formatNumber(display.linkClicks)} accent="#ec4899" />
           <KPICard label="Link CTR" value={formatPercent(display.linkCtr)} accent="#0891b2" />
         </Section>

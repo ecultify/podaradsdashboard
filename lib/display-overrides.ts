@@ -42,12 +42,17 @@ export type RawDisplayOverrides = {
   /** Explicit balance only when MANUAL_BALANCE_LEFT or file.balanceLeft set */
   balanceExplicit?: number;
   testTakers?: number;
+  googleAds?: number;
 };
 
 function sheetRowHasValues(row: SheetKpiRow | null): boolean {
   if (!row) return false;
   return (
-    row.totalAmount !== undefined || row.amountSpent !== undefined || row.linkClicks !== undefined || row.testTakers !== undefined
+    row.totalAmount !== undefined ||
+    row.amountSpent !== undefined ||
+    row.linkClicks !== undefined ||
+    row.testTakers !== undefined ||
+    row.googleAds !== undefined
   );
 }
 
@@ -95,12 +100,17 @@ export async function getRawDisplayOverrides(): Promise<{
     parseEnvNumber('MANUAL_TEST_TAKERS') ??
     numOrUndef(sheet?.testTakers);
 
+  const googleAds =
+    parseEnvNumber('MANUAL_GOOGLE_ADS') ??
+    numOrUndef(sheet?.googleAds);
+
   const out: RawDisplayOverrides = {};
   if (totalAmount !== undefined) out.totalAmount = totalAmount;
   if (amountSpent !== undefined) out.amountSpent = amountSpent;
   if (linkClicks !== undefined) out.linkClicks = linkClicks;
   if (balanceExplicit !== undefined) out.balanceExplicit = balanceExplicit;
   if (testTakers !== undefined) out.testTakers = testTakers;
+  if (googleAds !== undefined) out.googleAds = googleAds;
 
   return { raw: out, sheetMeta };
 }
@@ -124,6 +134,7 @@ export function finalizeDisplayOverrides(
   if (raw.linkClicks !== undefined) out.linkClicks = raw.linkClicks;
   if (raw.totalAmount !== undefined) out.totalAmount = raw.totalAmount;
   if (raw.testTakers !== undefined) out.testTakers = raw.testTakers;
+  if (raw.googleAds !== undefined) out.googleAds = raw.googleAds;
 
   if (raw.balanceExplicit !== undefined) {
     out.balanceLeft = raw.balanceExplicit;

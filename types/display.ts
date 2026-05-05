@@ -7,6 +7,8 @@ export type DisplayOverridesPayload = {
   totalAmount?: number;
   /** Test takers count from Google Sheet (overrides hardcoded constant). */
   testTakers?: number;
+  /** Google Ads impressions from Google Sheet — added to Meta impressions for CTR. */
+  googleAds?: number;
 };
 
 export type SheetConnectionMeta =
