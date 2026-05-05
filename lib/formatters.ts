@@ -14,6 +14,13 @@ export function formatNumber(num: number): string {
   return num.toLocaleString('en-US');
 }
 
+export function formatNumberIN(num: number): string {
+  if (num >= 10_000_000) return `${(num / 10_000_000).toFixed(2)}Cr`;
+  if (num >= 100_000) return `${(num / 100_000).toFixed(2)}L`;
+  if (num >= 1_000) return `${(num / 1_000).toFixed(1)}K`;
+  return num.toLocaleString('en-IN');
+}
+
 export function formatPercent(num: number): string {
   return `${num.toFixed(2)}%`;
 }
