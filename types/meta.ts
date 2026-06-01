@@ -1,4 +1,4 @@
-// types/meta.ts — shared shapes for the dashboard (wire to Meta API later)
+// types/meta.ts — shapes for the Podar website-leads dashboard
 
 export interface MetaInsights {
   impressions: string;
@@ -20,55 +20,6 @@ export interface MetaAction {
   value: string;
 }
 
-
-export interface AdSet {
-  id: string;
-  name: string;
-  status: string;
-  effective_status: string;
-  daily_budget?: string;
-  lifetime_budget?: string;
-  budget_remaining?: string;
-  optimization_goal: string;
-  billing_event: string;
-  bid_strategy?: string;
-  targeting?: {
-    age_min?: number;
-    age_max?: number;
-    genders?: number[];
-    geo_locations?: {
-      countries?: string[];
-      cities?: { key: string; name: string }[];
-    };
-  };
-  insights?: {
-    data: MetaInsights[];
-  };
-  start_time?: string;
-  end_time?: string;
-  created_time: string;
-  updated_time: string;
-}
-
-export interface Campaign {
-  id: string;
-  name: string;
-  status: string;
-  effective_status: string;
-  objective: string;
-  daily_budget?: string;
-  lifetime_budget?: string;
-  budget_remaining?: string;
-  created_time: string;
-  updated_time: string;
-  insights?: {
-    data: MetaInsights[];
-  };
-  adsets?: {
-    data: AdSet[];
-  };
-}
-
 export interface AdAccount {
   id: string;
   name: string;
@@ -81,69 +32,38 @@ export interface AdAccount {
   timezone_name: string;
 }
 
-export type ResultType =
-  | 'lead'
-  | 'messaging_conversation_started_7d'
-  | 'link_click'
-  | 'post_engagement'
-  | 'page_engagement'
-  | 'video_view'
-  | 'landing_page_view'
-  | 'omni_purchase'
-  | 'add_to_cart'
-  | 'onsite_conversion.messaging_conversation_started_7d'
-  | 'other';
+/** Metrics shared by campaign / ad set / ad rows. */
+export interface EntityMetrics {
+  leads: number;
+  costPerLead: number;
+  results: number;
+  spend: number;
+  impressions: number;
+  reach: number;
+  frequency: number;
+  cpm: number;
+  clicks: number;
+  linkClicks: number;
+  ctr: number;
+  insightsAvailable: boolean;
+}
 
-export interface DashboardAd {
+export interface DashboardAd extends EntityMetrics {
   id: string;
   name: string;
   status: string;
   effectiveStatus: string;
-  creativeId?: string;
   thumbnailUrl?: string;
-  leads: number;
-  results: number;
-  resultType: ResultType | null;
-  costPerResult: number;
-  impressions: number;
-  reach: number;
-  clicks: number;
-  spend: number;
-  cpc: number;
-  cpm: number;
-  ctr: number;
-  cpl: number;
-  frequency: number;
-  dateStart: string;
-  dateStop: string;
-  insightsAvailable: boolean;
 }
 
-export interface DashboardAdSet {
+export interface DashboardAdSet extends EntityMetrics {
   id: string;
   name: string;
   status: string;
   effectiveStatus: string;
   budget: number;
-  budgetType: 'daily' | 'lifetime';
-  budgetRemaining: number;
-  leads: number;
-  results: number;
-  resultType: ResultType | null;
-  costPerResult: number;
-  impressions: number;
-  reach: number;
-  clicks: number;
-  spend: number;
-  cpc: number;
-  cpm: number;
-  ctr: number;
-  cpl: number;
-  frequency: number;
-  optimizationGoal: string;
-  dateStart: string;
-  dateStop: string;
-  insightsAvailable: boolean;
+  budgetType: 'daily' | 'lifetime' | null;
+  optimizationGoal?: string;
   ads: DashboardAd[];
 }
 
@@ -156,39 +76,16 @@ export interface EngagementMetrics {
   linkClicks: number;
 }
 
-export interface DashboardCampaign {
+export interface DashboardCampaign extends EntityMetrics {
   id: string;
   name: string;
   status: string;
   objective: string;
-  totalLeads: number;
-  totalResults: number;
-  resultType: ResultType | null;
-  costPerResult: number;
-  totalImpressions: number;
-  totalReach: number;
-  totalClicks: number;
-  totalSpend: number;
-  avgCpl: number;
-  avgCtr: number;
   budget: number;
-  budgetRemaining: number;
   budgetType: 'daily' | 'lifetime' | null;
   currency: string;
   engagement: EngagementMetrics;
   adsets: DashboardAdSet[];
-}
-
-export interface LeadsBreakdown {
-  total: number;
-  vote: number;
-  shareYourKissa: number;
-  guessTheColony: number;
-}
-
-export interface DmConversations {
-  whatsapp: number;
-  instagram: number;
 }
 
 export interface DashboardData {
@@ -201,17 +98,19 @@ export interface DashboardData {
     spendCap: number;
     timezone: string;
   };
-  campaigns: DashboardCampaign[];
-  leadsBreakdown: LeadsBreakdown;
-  dmConversations: DmConversations;
+  campaign: DashboardCampaign;
+  datePreset: string;
   lastUpdated: string;
-  filter?: {
-    campaignNameContains: string;
-  };
 }
 
 export interface ApiResponse<T> {
   success: boolean;
   data?: T;
   error?: string;
+  /** Cache metadata so the client can show "cached / live". */
+  cache?: {
+    hit: boolean;
+    ageSeconds: number;
+    ttlSeconds: number;
+  };
 }
