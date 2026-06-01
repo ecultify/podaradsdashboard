@@ -1,6 +1,6 @@
-// lib/meta-api.ts — Podar website-leads dashboard data layer.
+// lib/meta-api.ts — Podar ads dashboard data layer.
 //
-// Tracks a SINGLE campaign (website leads) -> its ad sets -> their ads, pulling
+// Aggregates ALL campaigns in the ad account via account-level insights, pulling
 // everything from the Meta Graph API. All KPIs (leads, cost/lead, spend, reach,
 // impressions, frequency, CPM, link clicks, CTR) come straight from Meta.
 
@@ -12,8 +12,6 @@ import {
   EngagementMetrics,
   DashboardData,
   DashboardCampaign,
-  DashboardAdSet,
-  DashboardAd,
 } from '@/types/meta';
 
 const META_API_VERSION = 'v25.0';
@@ -64,36 +62,6 @@ type InsightsWithIds = MetaInsights & {
   ad_id?: string;
 };
 
-interface RawCampaign {
-  id: string;
-  name: string;
-  status: string;
-  effective_status: string;
-  objective: string;
-  daily_budget?: string;
-  lifetime_budget?: string;
-}
-
-interface RawAdSet {
-  id: string;
-  name: string;
-  status: string;
-  effective_status: string;
-  daily_budget?: string;
-  lifetime_budget?: string;
-  optimization_goal?: string;
-  campaign_id?: string;
-}
-
-interface RawAd {
-  id: string;
-  name: string;
-  status: string;
-  effective_status: string;
-  adset_id?: string;
-  creative?: { id?: string; thumbnail_url?: string };
-}
-
 const EMPTY_METRICS: EntityMetrics = {
   leads: 0,
   costPerLead: 0,
@@ -109,42 +77,18 @@ const EMPTY_METRICS: EntityMetrics = {
   insightsAvailable: false,
 };
 
-function budgetFrom(daily?: string, lifetime?: string): {
-  budget: number;
-  budgetType: 'daily' | 'lifetime' | null;
-} {
-  if (daily && parseFloat(daily) > 0) {
-    return { budget: parseFloat(daily) / 100, budgetType: 'daily' };
-  }
-  if (lifetime && parseFloat(lifetime) > 0) {
-    return { budget: parseFloat(lifetime) / 100, budgetType: 'lifetime' };
-  }
-  return { budget: 0, budgetType: null };
-}
-
 class MetaApiClient {
   private accessToken: string;
   private adAccountId: string;
-  private campaignId: string;
-  private adsetIds: string[];
 
   constructor() {
     this.accessToken = process.env.META_ACCESS_TOKEN || '';
     this.adAccountId = process.env.META_AD_ACCOUNT_ID || '';
-    this.campaignId = process.env.META_CAMPAIGN_ID_WEBSITE_LEADS?.trim() || '';
-
-    const rawAdsets = process.env.META_ADSET_IDS?.trim() || '';
-    this.adsetIds = rawAdsets
-      ? rawAdsets.split(',').map((s) => s.trim()).filter(Boolean)
-      : [];
 
     if (!this.accessToken || !this.adAccountId) {
       throw new Error(
         'META_ACCESS_TOKEN and META_AD_ACCOUNT_ID must be set in environment variables'
       );
-    }
-    if (!this.campaignId) {
-      throw new Error('META_CAMPAIGN_ID_WEBSITE_LEADS must be set in environment variables');
     }
   }
 
@@ -212,38 +156,6 @@ class MetaApiClient {
     });
   }
 
-  private async getCampaign(): Promise<RawCampaign> {
-    return this.fetch<RawCampaign>(`/${this.campaignId}`, {
-      fields: 'id,name,status,effective_status,objective,daily_budget,lifetime_budget',
-    });
-  }
-
-  private async getAdSets(): Promise<RawAdSet[]> {
-    const res = await this.fetch<{ data?: RawAdSet[] }>(`/${this.campaignId}/adsets`, {
-      fields:
-        'id,name,status,effective_status,daily_budget,lifetime_budget,optimization_goal,campaign_id',
-      limit: '200',
-    });
-    let adsets = res.data ?? [];
-
-    // If specific ad sets are configured, keep only those and honour their order.
-    if (this.adsetIds.length > 0) {
-      const byId = new Map(adsets.map((a) => [a.id, a]));
-      adsets = this.adsetIds
-        .map((id) => byId.get(id))
-        .filter((a): a is RawAdSet => !!a);
-    }
-    return adsets;
-  }
-
-  private async getAds(): Promise<RawAd[]> {
-    const res = await this.fetch<{ data?: RawAd[] }>(`/${this.campaignId}/ads`, {
-      fields: 'id,name,status,effective_status,adset_id,creative{id,thumbnail_url}',
-      limit: '300',
-    });
-    return res.data ?? [];
-  }
-
   // --- metric extraction -----------------------------------------------------
 
   private leadCount(actions?: MetaAction[]): { count: number; type: string | null } {
@@ -304,92 +216,36 @@ class MetaApiClient {
 
   // --- assembly --------------------------------------------------------------
 
+  /**
+   * Aggregate ALL campaigns in the ad account. We query account-level insights,
+   * which Meta returns as a single row already summed across every campaign
+   * (and with reach de-duplicated account-wide). The result is mapped into the
+   * same DashboardData shape so the dashboard UI is unchanged.
+   */
   async getDashboardData(datePreset: string = 'maximum'): Promise<DashboardData> {
-    // 1. Account + campaign + entity lists (small calls).
-    const [account, campaign, adsetsRaw, adsRaw] = await Promise.all([
+    const [account, accountRows] = await Promise.all([
       this.getAccount(),
-      this.getCampaign(),
-      this.getAdSets(),
-      this.getAds(),
-    ]);
-
-    // 2. Insights at all three levels for this campaign, in parallel.
-    // The entity-id field MUST be requested per level, otherwise rows come back
-    // without an id and can't be matched to their ad set / ad.
-    const [campaignRows, adsetRows, adRows] = await Promise.all([
-      this.fetchInsights(`/${this.campaignId}/insights`, {
+      // No `level` → defaults to account level: one aggregated row for all campaigns.
+      this.fetchInsights(`/${this.adAccountId}/insights`, {
         date_preset: datePreset,
-        level: 'campaign',
-        fields: `${INSIGHT_FIELDS},campaign_id`,
-      }),
-      this.fetchInsights(`/${this.campaignId}/insights`, {
-        date_preset: datePreset,
-        level: 'adset',
-        fields: `${INSIGHT_FIELDS},adset_id`,
-      }),
-      this.fetchInsights(`/${this.campaignId}/insights`, {
-        date_preset: datePreset,
-        level: 'ad',
-        fields: `${INSIGHT_FIELDS},ad_id,adset_id`,
+        fields: INSIGHT_FIELDS,
       }),
     ]);
 
-    const adsetInsightsById = new Map<string, MetaInsights>();
-    for (const row of adsetRows) if (row.adset_id) adsetInsightsById.set(row.adset_id, row);
-
-    const adInsightsById = new Map<string, MetaInsights>();
-    for (const row of adRows) if (row.ad_id) adInsightsById.set(row.ad_id, row);
-
-    // Group ads under their ad set.
-    const adsByAdSet = new Map<string, DashboardAd[]>();
-    for (const ad of adsRaw) {
-      const metrics = this.buildMetrics(adInsightsById.get(ad.id) ?? null);
-      const dashAd: DashboardAd = {
-        id: ad.id,
-        name: ad.name,
-        status: ad.status,
-        effectiveStatus: ad.effective_status,
-        thumbnailUrl: ad.creative?.thumbnail_url,
-        ...metrics,
-      };
-      const key = ad.adset_id ?? '';
-      const list = adsByAdSet.get(key) ?? [];
-      list.push(dashAd);
-      adsByAdSet.set(key, list);
-    }
-
-    const adsets: DashboardAdSet[] = adsetsRaw.map((adset) => {
-      const metrics = this.buildMetrics(adsetInsightsById.get(adset.id) ?? null);
-      const { budget, budgetType } = budgetFrom(adset.daily_budget, adset.lifetime_budget);
-      const ads = (adsByAdSet.get(adset.id) ?? []).sort((a, b) => b.leads - a.leads);
-      return {
-        id: adset.id,
-        name: adset.name,
-        status: adset.status,
-        effectiveStatus: adset.effective_status,
-        budget,
-        budgetType,
-        optimizationGoal: adset.optimization_goal,
-        ads,
-        ...metrics,
-      };
-    });
-
-    const campaignRow = campaignRows[0] ?? null;
-    const campaignMetrics = this.buildMetrics(campaignRow);
-    const { budget, budgetType } = budgetFrom(campaign.daily_budget, campaign.lifetime_budget);
+    const aggRow = accountRows[0] ?? null;
+    const metrics = this.buildMetrics(aggRow);
 
     const dashboardCampaign: DashboardCampaign = {
-      id: campaign.id,
-      name: campaign.name,
-      status: campaign.effective_status,
-      objective: campaign.objective,
-      budget,
-      budgetType,
+      id: account.id,
+      name: 'All Campaigns',
+      status: '',
+      objective: '',
+      budget: 0,
+      budgetType: null,
       currency: account.currency || 'INR',
-      engagement: this.extractEngagement(campaignRow),
-      adsets,
-      ...campaignMetrics,
+      engagement: this.extractEngagement(aggRow),
+      adsets: [],
+      ...metrics,
     };
 
     return {
