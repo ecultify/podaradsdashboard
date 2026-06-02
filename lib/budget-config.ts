@@ -21,9 +21,10 @@ export const GOOGLE_BUDGET_INR = numEnv('GOOGLE_BUDGET_INR', 66964.287);
 /** Multiplier applied to raw platform spend to get the billed amount. */
 export const SPEND_MULTIPLIER = numEnv('SPEND_MULTIPLIER', 4.5);
 
-/** Computes billed spend + remaining balance for a given budget. */
-export function computeBudget(rawSpend: number, budget: number) {
-  const billedSpend = rawSpend * SPEND_MULTIPLIER;
+/** Computes billed spend + remaining balance for a given budget.
+ *  Pass `multiplier` to override the global (e.g. 1 to bill raw spend). */
+export function computeBudget(rawSpend: number, budget: number, multiplier: number = SPEND_MULTIPLIER) {
+  const billedSpend = rawSpend * multiplier;
   return {
     budget,
     billedSpend,

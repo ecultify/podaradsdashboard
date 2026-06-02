@@ -3,7 +3,7 @@
 import * as Tabs from '@radix-ui/react-tabs';
 import { DASHBOARD_BRAND_LETTER, DASHBOARD_TITLE, DASHBOARD_SUBTITLE } from '@/lib/dashboard-config';
 import { MetaTab } from '@/components/MetaTab';
-import { GoogleAdsTab } from '@/components/GoogleAdsTab';
+// import { GoogleAdsTab } from '@/components/GoogleAdsTab'; // Google Ads tab hidden for now
 
 export default function Dashboard() {
   return (
@@ -34,7 +34,7 @@ export default function Dashboard() {
         <div className="sticky top-[65px] z-40 border-b" style={{ borderColor: '#e5e7eb', background: 'rgba(255,255,255,0.85)', backdropFilter: 'blur(16px)' }}>
           <Tabs.List className="max-w-[1200px] mx-auto px-6 flex gap-1">
             <TabTrigger value="meta">Meta Ads</TabTrigger>
-            <TabTrigger value="google">Google Ads</TabTrigger>
+            {/* <TabTrigger value="google">Google Ads</TabTrigger> */}
           </Tabs.List>
         </div>
 
@@ -42,9 +42,9 @@ export default function Dashboard() {
           <Tabs.Content value="meta" className="focus:outline-none">
             <MetaTab />
           </Tabs.Content>
-          <Tabs.Content value="google" className="focus:outline-none">
+          {/* <Tabs.Content value="google" className="focus:outline-none">
             <GoogleAdsTab />
-          </Tabs.Content>
+          </Tabs.Content> */}
         </main>
       </Tabs.Root>
     </div>

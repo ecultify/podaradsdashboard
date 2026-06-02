@@ -43,7 +43,8 @@ export function MetaTab() {
     ];
   }, [campaign]);
 
-  const budget = useMemo(() => computeBudget(totals.spend, META_BUDGET_INR), [totals.spend]);
+  // Meta bills raw spend (no multiplier).
+  const budget = useMemo(() => computeBudget(totals.spend, META_BUDGET_INR, 1), [totals.spend]);
 
   return (
     <div className="space-y-8">
