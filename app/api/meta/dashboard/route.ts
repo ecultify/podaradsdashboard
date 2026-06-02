@@ -9,10 +9,13 @@ export const maxDuration = 120;
 export async function GET(request: NextRequest) {
   const searchParams = request.nextUrl.searchParams;
   const datePreset = searchParams.get('date_preset') || 'maximum';
+  const since = searchParams.get('since') || undefined;
+  const until = searchParams.get('until') || undefined;
   // `?refresh=1` bypasses (and refreshes) the cache — wired to the header button.
   const forceRefresh = searchParams.get('refresh') === '1';
 
-  const cacheKey = `dashboard:${datePreset}`;
+  const useCustom = Boolean(since && until);
+  const cacheKey = useCustom ? `dashboard:${since}_${until}` : `dashboard:${datePreset}`;
   const ttl = getCacheTtlSeconds();
 
   try {
@@ -31,7 +34,9 @@ export async function GET(request: NextRequest) {
     }
 
     const client = new MetaApiClient();
-    const data = await client.getDashboardData(datePreset);
+    const data = await client.getDashboardData(
+      useCustom ? { since, until } : { datePreset }
+    );
     setCached(cacheKey, data, ttl);
 
     const response: ApiResponse<DashboardData> = {

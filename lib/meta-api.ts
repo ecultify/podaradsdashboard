@@ -222,14 +222,24 @@ class MetaApiClient {
    * (and with reach de-duplicated account-wide). The result is mapped into the
    * same DashboardData shape so the dashboard UI is unchanged.
    */
-  async getDashboardData(datePreset: string = 'maximum'): Promise<DashboardData> {
+  async getDashboardData(
+    opts: { datePreset?: string; since?: string; until?: string } = {}
+  ): Promise<DashboardData> {
+    const { datePreset = 'maximum', since, until } = opts;
+
+    // A since+until pair takes priority and is sent as Meta's time_range;
+    // otherwise we fall back to a named date_preset.
+    const insightParams: Record<string, string> = { fields: INSIGHT_FIELDS };
+    if (since && until) {
+      insightParams.time_range = JSON.stringify({ since, until });
+    } else {
+      insightParams.date_preset = datePreset;
+    }
+
     const [account, accountRows] = await Promise.all([
       this.getAccount(),
       // No `level` → defaults to account level: one aggregated row for all campaigns.
-      this.fetchInsights(`/${this.adAccountId}/insights`, {
-        date_preset: datePreset,
-        fields: INSIGHT_FIELDS,
-      }),
+      this.fetchInsights(`/${this.adAccountId}/insights`, insightParams),
     ]);
 
     const aggRow = accountRows[0] ?? null;
@@ -259,7 +269,9 @@ class MetaApiClient {
         timezone: account.timezone_name || 'Asia/Kolkata',
       },
       campaign: dashboardCampaign,
-      datePreset,
+      datePreset: since && until ? 'custom' : datePreset,
+      dateStart: aggRow?.date_start,
+      dateStop: aggRow?.date_stop,
       lastUpdated: new Date().toISOString(),
     };
   }

@@ -11,6 +11,9 @@ interface CacheMeta {
 
 interface UseDashboardDataOptions {
   datePreset?: string;
+  /** Custom date window (YYYY-MM-DD). When both set, overrides datePreset. */
+  since?: string;
+  until?: string;
   refreshInterval?: number;
   /** When true, polls on an interval. Default false: load once, then on manual refresh. */
   autoRefresh?: boolean;
@@ -29,7 +32,8 @@ interface UseDashboardDataReturn {
 export function useDashboardData(
   options: UseDashboardDataOptions = {}
 ): UseDashboardDataReturn {
-  const { datePreset = 'maximum', refreshInterval = 300, autoRefresh = false } = options;
+  const { datePreset = 'maximum', since, until, refreshInterval = 300, autoRefresh = false } = options;
+  const useCustom = Boolean(since && until);
 
   const [data, setData] = useState<DashboardData | null>(null);
   const [cache, setCache] = useState<CacheMeta | null>(null);
@@ -43,7 +47,13 @@ export function useDashboardData(
         setLoading(true);
         setError(null);
 
-        const params = new URLSearchParams({ date_preset: datePreset });
+        const params = new URLSearchParams();
+        if (useCustom) {
+          params.set('since', since as string);
+          params.set('until', until as string);
+        } else {
+          params.set('date_preset', datePreset);
+        }
         if (force) params.set('refresh', '1');
 
         const response = await fetch(`/api/meta/dashboard?${params}`);
@@ -75,7 +85,7 @@ export function useDashboardData(
         setLoading(false);
       }
     },
-    [datePreset]
+    [datePreset, since, until, useCustom]
   );
 
   useEffect(() => {

@@ -1,17 +1,40 @@
 'use client';
 
-import { useMemo } from 'react';
+import { useMemo, useState } from 'react';
 import { useDashboardData } from '@/hooks/useDashboardData';
 import { formatCurrency, formatNumber, formatNumberIN, formatPercent } from '@/lib/formatters';
 import { Section, KPICard, DataToolbar, ErrorBanner, LoadingGrid } from '@/components/dashboard-ui';
 import { META_BUDGET_INR, computeBudget } from '@/lib/budget-config';
 
-export function MetaTab() {
-  const { data, cache, loading, error, refresh, lastRefreshed } = useDashboardData({
-    datePreset: 'maximum',
-    autoRefresh: false,
-  });
+const DATE_PRESETS = [
+  { value: 'today', label: 'Today' },
+  { value: 'yesterday', label: 'Yesterday' },
+  { value: 'last_7d', label: 'Last 7 days' },
+  { value: 'last_14d', label: 'Last 14 days' },
+  { value: 'last_30d', label: 'Last 30 days' },
+  { value: 'last_90d', label: 'Last 90 days' },
+  { value: 'this_month', label: 'This month' },
+  { value: 'last_month', label: 'Last month' },
+  { value: 'maximum', label: 'All time' },
+  { value: 'custom', label: 'Custom range' },
+];
 
+export function MetaTab() {
+  const [preset, setPreset] = useState('maximum');
+  const [since, setSince] = useState('');
+  const [until, setUntil] = useState('');
+
+  const isCustom = preset === 'custom';
+  const customActive = isCustom && Boolean(since && until);
+
+  // Date-scoped view → drives Spend Overview / Performance / Engagement.
+  const view = useDashboardData(
+    customActive ? { since, until } : { datePreset: isCustom ? 'maximum' : preset }
+  );
+  // All-time view → drives the Budget section so "Spend Used" never changes with the filter.
+  const budgetView = useDashboardData({ datePreset: 'maximum' });
+
+  const data = view.data;
   const campaign = data?.campaign ?? null;
   const currency = data?.account?.currency || 'INR';
 
@@ -43,21 +66,47 @@ export function MetaTab() {
     ];
   }, [campaign]);
 
-  // Meta bills raw spend (no multiplier).
-  const budget = useMemo(() => computeBudget(totals.spend, META_BUDGET_INR, 1), [totals.spend]);
+  // Budget always uses all-time spend (Meta bills raw spend, no multiplier).
+  const budget = useMemo(
+    () => computeBudget(budgetView.data?.campaign?.spend ?? 0, META_BUDGET_INR, 1),
+    [budgetView.data]
+  );
+
+  const refreshAll = () => {
+    view.refresh(true);
+    budgetView.refresh(true);
+  };
+
+  const rangeLabel =
+    data?.dateStart && data?.dateStop
+      ? data.dateStart === data.dateStop
+        ? data.dateStart
+        : `${data.dateStart} → ${data.dateStop}`
+      : null;
 
   return (
     <div className="space-y-8">
       <DataToolbar
-        label={data?.account?.name || (loading ? 'Loading…' : null)}
-        cacheHit={cache?.hit}
-        lastRefreshed={lastRefreshed}
-        loading={loading}
-        onRefresh={() => refresh(true)}
+        label={data?.account?.name || (view.loading ? 'Loading…' : null)}
+        cacheHit={view.cache?.hit}
+        lastRefreshed={view.lastRefreshed}
+        loading={view.loading || budgetView.loading}
+        onRefresh={refreshAll}
         refreshTitle="Pull fresh data from Meta (bypasses cache)"
       />
 
-      {error && <ErrorBanner message={error} onRetry={() => refresh(true)} />}
+      <DateFilterBar
+        preset={preset}
+        onPreset={setPreset}
+        isCustom={isCustom}
+        since={since}
+        until={until}
+        onSince={setSince}
+        onUntil={setUntil}
+        rangeLabel={rangeLabel}
+      />
+
+      {view.error && <ErrorBanner message={view.error} onRetry={refreshAll} />}
 
       <Section title="Budget">
         <KPICard label="Total Budget" value={formatCurrency(budget.budget, currency)} accent="#6366f1" />
@@ -120,7 +169,80 @@ export function MetaTab() {
         </div>
       </div>
 
-      {loading && !data && <LoadingGrid />}
+      {view.loading && !data && <LoadingGrid />}
+    </div>
+  );
+}
+
+function DateFilterBar({
+  preset,
+  onPreset,
+  isCustom,
+  since,
+  until,
+  onSince,
+  onUntil,
+  rangeLabel,
+}: {
+  preset: string;
+  onPreset: (v: string) => void;
+  isCustom: boolean;
+  since: string;
+  until: string;
+  onSince: (v: string) => void;
+  onUntil: (v: string) => void;
+  rangeLabel: string | null;
+}) {
+  const inputClass =
+    'rounded-lg border px-3 py-1.5 text-sm bg-white focus:outline-none focus:ring-2 focus:ring-blue-200';
+  return (
+    <div className="flex flex-wrap items-center gap-3 rounded-xl border p-3" style={{ borderColor: '#e5e7eb', background: '#fff' }}>
+      <span className="text-xs uppercase tracking-wider font-semibold" style={{ color: '#9ca3af' }}>
+        Date
+      </span>
+
+      <select
+        value={preset}
+        onChange={(e) => onPreset(e.target.value)}
+        className={inputClass}
+        style={{ borderColor: '#e5e7eb', color: '#111827' }}
+      >
+        {DATE_PRESETS.map((p) => (
+          <option key={p.value} value={p.value}>
+            {p.label}
+          </option>
+        ))}
+      </select>
+
+      {isCustom && (
+        <div className="flex items-center gap-2">
+          <input
+            type="date"
+            value={since}
+            max={until || undefined}
+            onChange={(e) => onSince(e.target.value)}
+            className={inputClass}
+            style={{ borderColor: '#e5e7eb', color: '#111827' }}
+          />
+          <span className="text-xs" style={{ color: '#9ca3af' }}>
+            to
+          </span>
+          <input
+            type="date"
+            value={until}
+            min={since || undefined}
+            onChange={(e) => onUntil(e.target.value)}
+            className={inputClass}
+            style={{ borderColor: '#e5e7eb', color: '#111827' }}
+          />
+        </div>
+      )}
+
+      {rangeLabel && (
+        <span className="ml-auto text-xs" style={{ color: '#6b7280', fontFamily: "'JetBrains Mono', monospace" }}>
+          Showing {rangeLabel}
+        </span>
+      )}
     </div>
   );
 }

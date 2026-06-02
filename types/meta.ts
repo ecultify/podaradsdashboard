@@ -100,6 +100,9 @@ export interface DashboardData {
   };
   campaign: DashboardCampaign;
   datePreset: string;
+  /** Actual date window the insights row covers (YYYY-MM-DD), from Meta. */
+  dateStart?: string;
+  dateStop?: string;
   lastUpdated: string;
 }
 
